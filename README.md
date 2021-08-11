@@ -12,6 +12,15 @@
 - Unity
 
 ## 개인 프로젝트
-![image](https://user-images.githubusercontent.com/71554512/128973749-ddd5090c-fbf3-4274-9d9d-6df8685cc3bc.png)
-
-
+### 1인칭 생존게임
+- 장르 : 1인칭 서바이벌
+- 엔진 : 유니티
+- 영상 링크 : https://youtu.be/3DXykqEgauo
+### 하이퍼 FPS
+- 장르 : 하이퍼 FPS
+- 엔진 : 유니티
+- 영상 링크 : https://youtu.be/FaynuZJAIP0
+### 3D 플랫포머 게임 (유튜브 수탉 팬게임)
+- 장르 : 3D 플랫포머
+- 엔진 : 유니티
+- 영상 링크 : https://youtu.be/6yR2hKDzEpc
