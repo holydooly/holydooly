@@ -1,0 +1,222 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class PlayerMovement : MonoBehaviour
+{
+    private Rigidbody rb;
+    private Animator anim;
+    private PlayerAnimationSound sound;
+
+    [SerializeField] private Transform cam;
+    [SerializeField] private Transform pickupRay;
+    [SerializeField] private GameObject Box;
+
+    [Header("Movement")]
+    [SerializeField] private float walkSpeed = 2f;
+    [SerializeField] private float runSpeed = 6f;
+    [SerializeField] private float jumpForce = 3f;
+    [SerializeField] private float jumpPadForce = 20f;
+    [SerializeField] public float currentSpeed;
+    [SerializeField] private float turnSmoothTime = 0.05f;
+    [SerializeField] private float groundDrag = 3f;
+    [SerializeField] private float airDrag = 1f;
+    [SerializeField] public bool isRun;
+    [SerializeField] private bool isJump;
+    [SerializeField] private bool isPickUp;
+    [SerializeField] private bool StartPickUp;
+
+    [Header("CheckGround")]
+    [SerializeField] public bool isGround;
+    [SerializeField] private Transform groundCheck;
+    [SerializeField] private float checkLength = 0.4f;
+    [SerializeField] private LayerMask groundLayer;
+
+    float turnSmoothVelocity;
+
+    private Vector3 dir;
+    private Vector3 moveDir;
+    private RaycastHit hit;
+
+    private void Start()
+    {
+        pickupRay = GetComponent<Transform>().GetChild(4).transform;
+        rb = GetComponent<Rigidbody>();
+        anim = GetComponent<Animator>();
+        sound = GetComponent<PlayerAnimationSound>();
+
+        Cursor.lockState = CursorLockMode.Locked;
+    }
+
+    private void FixedUpdate()
+    {
+        float x = Input.GetAxisRaw("Horizontal");
+        float z = Input.GetAxisRaw("Vertical");
+
+        dir = new Vector3(x, 0f, z).normalized;
+
+        if (dir.magnitude >= 0.1f)
+        {                 
+            anim.SetBool("isWalking", true);
+
+            if (isPickUp)
+            {
+                anim.SetBool("isPickupWalk", true);
+            }
+
+            float targetAngle = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg + cam.eulerAngles.y;
+
+            float angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref turnSmoothVelocity, turnSmoothTime);
+            transform.rotation = Quaternion.Euler(0, angle, 0);
+
+            moveDir = Quaternion.Euler(0, targetAngle, 0) * Vector3.forward;
+
+            rb.AddForce(moveDir.normalized * currentSpeed * 10, ForceMode.Acceleration);
+
+            if (Input.GetKey(KeyCode.LeftShift) && !isPickUp)
+            {
+                isRun = true;
+                anim.SetBool("isRunning", true);
+                currentSpeed = Mathf.Lerp(currentSpeed, runSpeed, Time.deltaTime * 5);
+            }
+            else
+            {
+                isRun = false;
+                anim.SetBool("isRunning", false);
+                currentSpeed = Mathf.Lerp(currentSpeed, walkSpeed, Time.deltaTime * 5);
+            }
+            
+        }
+        else if (dir.magnitude == 0)
+        {
+            anim.SetBool("isWalking", false);
+            anim.SetBool("isRunning", false);
+
+            if (isPickUp)
+            {
+                anim.SetBool("isPickupWalk", false);
+                anim.SetBool("isPickupIdle", true);
+            }
+        }         
+    }
+
+    private void Update()
+    {
+        CheckGround();
+        CheckObject();
+        Drag();
+        Jump();
+
+        if (!isPickUp)
+        {
+            anim.SetBool("isPickupWalk", false);
+            anim.SetBool("isPickupIdle", false);
+        }
+
+        if (isJump && isGround)
+        {
+            sound.JumpSound_landing.Play();
+            isJump = false;
+        }
+
+        if (isPickUp)
+        {
+            if (Input.GetKeyDown(KeyCode.E))
+            {
+                Box.transform.parent = null;
+                Box.transform.GetComponent<Rigidbody>().isKinematic = false;
+                Box.transform.GetComponent<Rigidbody>().useGravity = true;
+
+                Box.transform.GetComponent<Rigidbody>().AddForce(Box.transform.forward * 40f, ForceMode.Impulse);
+
+                Box.transform.GetComponent<Rigidbody>().drag = 6;
+
+                Box = null;
+
+                isPickUp = false;
+            }
+        }
+    }
+    private void CheckObject()
+    {
+        if (Physics.Raycast(pickupRay.position, transform.forward, out hit, 5f))
+        {
+            if (hit.collider.CompareTag("Box"))
+            {
+                if (Input.GetKeyDown(KeyCode.E))
+                {
+                    Box = hit.collider.gameObject;
+                    StartCoroutine(PickUp());
+                }
+            }
+        }
+    }
+
+    IEnumerator PickUp()
+    {
+        yield return new WaitForSeconds(0.01f);
+        Box.transform.parent = transform.GetChild(6).transform;
+        Box.transform.GetComponent<Rigidbody>().isKinematic = true;
+        Box.transform.GetComponent<Rigidbody>().useGravity = false;
+        Box.transform.GetComponent<Rigidbody>().drag = 0;
+
+        isPickUp = true;
+
+        yield return new WaitForSeconds(0.2f);
+        Box.transform.localPosition = new Vector3(0, 0, 0);
+        Box.transform.localRotation = Quaternion.Euler(Vector3.zero);
+
+    }
+
+    private void Jump()
+    {
+        if (isGround && Input.GetKeyDown(KeyCode.Space) && !isPickUp) //점프
+        {
+            anim.SetBool("isJump", true);
+
+            sound.JumpSound_start.Play();
+            
+            //rb.velocity = new Vector3(rb.velocity.x, 0, rb.velocity.y);
+            rb.AddForce(transform.up * jumpForce * 10, ForceMode.Impulse);
+
+            
+            StartCoroutine(IsJump());
+        }
+    }
+
+    
+
+    IEnumerator IsJump()
+    {
+        yield return new WaitForSeconds(0.1f);
+        isJump = true;
+    }
+
+
+    public void JumpPad()
+    {
+        anim.SetBool("isJump", false);
+        
+        rb.AddForce(Vector3.up * jumpPadForce * 10, ForceMode.Impulse);
+    }
+
+    private void Drag()
+    {
+        if (isGround)
+        {
+            if (rb.velocity.y < 0)
+                anim.SetBool("isJump", false);
+
+            rb.drag = groundDrag;
+        }
+        else if (!isGround)
+        {
+            rb.drag = airDrag;
+        }
+    }
+
+    private void CheckGround()
+    {
+        isGround = Physics.CheckSphere(groundCheck.position, checkLength, groundLayer);
+    }
+}
